@@ -28,13 +28,12 @@ async function main() {
   const confirmChannel = await rabbitMq.createConfirmChannel();
 
   while (true) {
-    // do stuff infintely
-    const result = await getInput();
-    if (!result.length) {
+    const words = await getInput();
+    if (!words.length) {
       continue;
     }
 
-    if (result[0] === "pause") {
+    if (words[0] === "pause") {
       console.log("Sending pause message...");
       try {
         const pauseMessage: PlayingState = { isPaused: true };
@@ -49,7 +48,7 @@ async function main() {
       }
     }
 
-    if (result[0] === "resume") {
+    if (words[0] === "resume") {
       console.log("Sending resume message...");
       try {
         const resumeMessage: PlayingState = { isPaused: false };
@@ -64,13 +63,13 @@ async function main() {
       }
     }
 
-    if (result[0] === "quit") {
+    if (words[0] === "quit") {
       console.log("Exiting...");
-      break;
+      process.exit(0);
     }
 
-    if (result[0] && !["pause", "resume", "quit"].includes(result[0])) {
-      console.log(`Unknown command: ${result}`);
+    if (words[0] && !["pause", "resume", "quit"].includes(words[0])) {
+      console.log(`Unknown command: ${words}`);
     }
   }
 }
