@@ -10,6 +10,7 @@ import {
   declareAndBind,
   SimpleQueueType,
   subscribeJSON,
+  AckType,
 } from "../internal/pubsub/consume.js";
 import {
   ExchangePerilDirect,
@@ -22,7 +23,11 @@ import {
   type PlayingState,
 } from "../internal/gamelogic/gamestate.js";
 import { commandSpawn } from "../internal/gamelogic/spawn.js";
-import { commandMove, handleMove } from "../internal/gamelogic/move.js";
+import {
+  commandMove,
+  handleMove,
+  MoveOutcome,
+} from "../internal/gamelogic/move.js";
 import { type ArmyMove } from "../internal/gamelogic/gamedata.js";
 import { handlePause } from "../internal/gamelogic/pause.js";
 import { publishJSON } from "../internal/pubsub/publish.js";
@@ -139,16 +144,28 @@ main().catch((err) => {
   process.exit(1);
 });
 
-function handlerPause(gs: GameState): (ps: PlayingState) => void {
+function handlerPause(gs: GameState): (ps: PlayingState) => AckType {
   return (ps: PlayingState) => {
     handlePause(gs, ps);
     process.stdout.write("> ");
+    return AckType.Ack;
   };
 }
 
-function handlerMove(gs: GameState): (move: ArmyMove) => void {
+function handlerMove(gs: GameState): (move: ArmyMove) => AckType {
   return (move: ArmyMove) => {
-    handleMove(gs, move);
-    process.stdout.write("> ");
+    try {
+      const moveOutcome = handleMove(gs, move);
+      if (
+        moveOutcome === MoveOutcome.Safe ||
+        moveOutcome === MoveOutcome.MakeWar
+      ) {
+        return AckType.Ack;
+      } else {
+        return AckType.NackDiscard;
+      }
+    } finally {
+      process.stdout.write("> ");
+    }
   };
 }
