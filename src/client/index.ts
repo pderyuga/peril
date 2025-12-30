@@ -17,6 +17,7 @@ import {
   ExchangePerilTopic,
   PauseKey,
   ArmyMovesPrefix,
+  WarRecognitionsPrefix,
 } from "../internal/routing/routing.js";
 import {
   GameState,
@@ -28,9 +29,13 @@ import {
   handleMove,
   MoveOutcome,
 } from "../internal/gamelogic/move.js";
-import { type ArmyMove } from "../internal/gamelogic/gamedata.js";
+import {
+  type ArmyMove,
+  type RecognitionOfWar,
+} from "../internal/gamelogic/gamedata.js";
 import { handlePause } from "../internal/gamelogic/pause.js";
 import { publishJSON } from "../internal/pubsub/publish.js";
+import { handleWar, WarOutcome } from "../internal/gamelogic/war.js";
 
 async function main() {
   console.log("Starting Peril client...");
@@ -63,6 +68,7 @@ async function main() {
   );
 
   const gameState = new GameState(username);
+  const publishChannel = await rabbitMq.createConfirmChannel();
 
   await subscribeJSON(
     rabbitMq,
@@ -79,10 +85,17 @@ async function main() {
     `${ArmyMovesPrefix}.${username}`,
     `${ArmyMovesPrefix}.*`,
     SimpleQueueType.TRANSIENT,
-    handlerMove(gameState)
+    handlerMove(gameState, publishChannel)
   );
 
-  const publishChannel = await rabbitMq.createConfirmChannel();
+  await subscribeJSON(
+    rabbitMq,
+    ExchangePerilTopic,
+    `${WarRecognitionsPrefix}`,
+    `${WarRecognitionsPrefix}.*`,
+    SimpleQueueType.DURABLE,
+    handlerWar(gameState)
+  );
 
   while (true) {
     const words = await getInput();
@@ -152,18 +165,64 @@ function handlerPause(gs: GameState): (ps: PlayingState) => AckType {
   };
 }
 
-function handlerMove(gs: GameState): (move: ArmyMove) => AckType {
-  return (move: ArmyMove) => {
+function handlerMove(
+  gs: GameState,
+  publishChannel: amqp.ConfirmChannel
+): (move: ArmyMove) => Promise<AckType> {
+  return async (move: ArmyMove) => {
     try {
       const moveOutcome = handleMove(gs, move);
-      if (
-        moveOutcome === MoveOutcome.Safe ||
-        moveOutcome === MoveOutcome.MakeWar
-      ) {
-        return AckType.Ack;
-      } else {
-        return AckType.NackDiscard;
+      switch (moveOutcome) {
+        case MoveOutcome.Safe:
+        case MoveOutcome.SamePlayer:
+          return AckType.Ack;
+        case MoveOutcome.MakeWar:
+          const recognitionOfWar: RecognitionOfWar = {
+            attacker: move.player,
+            defender: gs.getPlayerSnap(),
+          };
+
+          try {
+            await publishJSON(
+              publishChannel,
+              ExchangePerilTopic,
+              `${WarRecognitionsPrefix}.${gs.getUsername()}`,
+              recognitionOfWar
+            );
+          } catch (err) {
+            console.error("Error publishing war recognition: ", err);
+          } finally {
+            return AckType.NackRequeue;
+          }
+        default:
+          return AckType.NackDiscard;
       }
+    } finally {
+      process.stdout.write("> ");
+    }
+  };
+}
+
+function handlerWar(gs: GameState): (rw: RecognitionOfWar) => Promise<AckType> {
+  return async (rw: RecognitionOfWar) => {
+    try {
+      const warResolution = handleWar(gs, rw);
+
+      switch (warResolution.result) {
+        case WarOutcome.NotInvolved:
+          return AckType.NackRequeue;
+        case WarOutcome.NoUnits:
+          return AckType.NackDiscard;
+        case WarOutcome.OpponentWon:
+        case WarOutcome.YouWon:
+        case WarOutcome.Draw:
+          return AckType.Ack;
+        default:
+          return AckType.NackDiscard;
+      }
+    } catch (err) {
+      console.error("Error has occurred: ", err);
+      return AckType.NackDiscard;
     } finally {
       process.stdout.write("> ");
     }

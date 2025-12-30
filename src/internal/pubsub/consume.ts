@@ -1,4 +1,5 @@
 import amqp, { type Channel } from "amqplib";
+import { GameLogSlug } from "../routing/routing.js";
 
 export enum SimpleQueueType {
   DURABLE = "durable",
@@ -21,14 +22,19 @@ export async function declareAndBind(
   // Create a new channel on the connection
   const channel = await conn.createChannel();
 
-  const queue = await channel.assertQueue(queueName, {
+  const queueOptions: amqp.Options.AssertQueue = {
     durable: queueType === SimpleQueueType.DURABLE,
     autoDelete: queueType === SimpleQueueType.TRANSIENT,
     exclusive: queueType === SimpleQueueType.TRANSIENT,
-    arguments: {
+  };
+
+  if (queueName !== GameLogSlug) {
+    queueOptions.arguments = {
       "x-dead-letter-exchange": "peril_dlx",
-    },
-  });
+    };
+  }
+
+  const queue = await channel.assertQueue(queueName, queueOptions);
 
   await channel.bindQueue(queueName, exchange, key);
 
@@ -41,7 +47,7 @@ export async function subscribeJSON<T>(
   queueName: string,
   key: string,
   queueType: SimpleQueueType,
-  handler: (data: T) => AckType
+  handler: (data: T) => Promise<AckType> | AckType
 ): Promise<void> {
   const [channel, queue] = await declareAndBind(
     conn,
@@ -51,7 +57,7 @@ export async function subscribeJSON<T>(
     queueType
   );
 
-  const onMessage = (message: amqp.ConsumeMessage | null) => {
+  const onMessage = async (message: amqp.ConsumeMessage | null) => {
     if (!message) {
       console.error("Message canceled by broker");
       return;
@@ -67,7 +73,7 @@ export async function subscribeJSON<T>(
     }
 
     try {
-      const result = handler(parsedMessage);
+      const result = await handler(parsedMessage);
 
       if (result === AckType.Ack) {
         channel.ack(message);
