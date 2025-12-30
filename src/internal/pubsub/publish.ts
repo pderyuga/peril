@@ -1,4 +1,5 @@
 import type { ConfirmChannel } from "amqplib";
+import { encode } from "@msgpack/msgpack";
 
 export async function publishJSON<T>(
   ch: ConfirmChannel,
@@ -18,6 +19,36 @@ export async function publishJSON<T>(
       buffer,
       {
         contentType: "application/json",
+      },
+      (err) => {
+        if (err) {
+          reject(new Error("Message was NAKed by the broker"));
+        } else {
+          resolve();
+        }
+      }
+    );
+  });
+}
+
+export function publishMsgPack<T>(
+  ch: ConfirmChannel,
+  exchange: string,
+  routingKey: string,
+  value: T
+): Promise<void> {
+  // Serialize value using MessagePack
+  const encodedValue = encode(value);
+  const buffer = Buffer.from(encodedValue);
+
+  // Publish the message to the exchange with the routing key
+  return new Promise((resolve, reject) => {
+    ch.publish(
+      exchange,
+      routingKey,
+      buffer,
+      {
+        contentType: "application/x-msgpack",
       },
       (err) => {
         if (err) {
