@@ -77,17 +77,14 @@ export async function subscribeJSON<T>(
 
       if (result === AckType.Ack) {
         channel.ack(message);
-        console.log("Message acknowledged");
       }
 
       if (result === AckType.NackRequeue) {
         channel.nack(message, false, true);
-        console.log("Message NACKed and requeued");
       }
 
       if (result === AckType.NackDiscard) {
         channel.nack(message, false, false);
-        console.log("Message NACKed and discarded");
       }
     } catch (err) {
       console.error("Error handling message: ", err);
