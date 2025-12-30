@@ -189,9 +189,9 @@ function handlerMove(
               `${WarRecognitionsPrefix}.${gs.getUsername()}`,
               recognitionOfWar
             );
+            return AckType.Ack;
           } catch (err) {
             console.error("Error publishing war recognition: ", err);
-          } finally {
             return AckType.NackRequeue;
           }
         default:
