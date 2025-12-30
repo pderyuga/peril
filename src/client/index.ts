@@ -9,11 +9,16 @@ import {
 import {
   declareAndBind,
   SimpleQueueType,
-} from "../internal/pubsub/declare-and-bind.js";
+  subscribeJSON,
+} from "../internal/pubsub/consume.js";
 import { ExchangePerilDirect, PauseKey } from "../internal/routing/routing.js";
-import { GameState } from "../internal/gamelogic/gamestate.js";
+import {
+  GameState,
+  type PlayingState,
+} from "../internal/gamelogic/gamestate.js";
 import { commandSpawn } from "../internal/gamelogic/spawn.js";
 import { commandMove } from "../internal/gamelogic/move.js";
+import { handlePause } from "../internal/gamelogic/pause.js";
 
 async function main() {
   console.log("Starting Peril client...");
@@ -46,6 +51,15 @@ async function main() {
   );
 
   const gameState = new GameState(username);
+
+  await subscribeJSON(
+    rabbitMq,
+    ExchangePerilDirect,
+    `${PauseKey}.${username}`,
+    PauseKey,
+    SimpleQueueType.TRANSIENT,
+    handlerPause(gameState)
+  );
 
   while (true) {
     const words = await getInput();
@@ -100,3 +114,10 @@ main().catch((err) => {
   console.error("Fatal error:", err);
   process.exit(1);
 });
+
+function handlerPause(gs: GameState): (ps: PlayingState) => void {
+  return (ps: PlayingState) => {
+    handlePause(gs, ps);
+    process.stdout.write("> ");
+  };
+}
