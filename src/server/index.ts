@@ -18,7 +18,6 @@ async function main() {
   const connectionString = "amqp://guest:guest@localhost:5672/";
   const rabbitMq = await amqp.connect(connectionString);
   console.log("Connection to RabbitMQ was successful!");
-  printServerHelp();
 
   ["SIGINT", "SIGTERM"].forEach((signal) =>
     process.on(signal, async () => {
@@ -33,8 +32,6 @@ async function main() {
     })
   );
 
-  const confirmChannel = await rabbitMq.createConfirmChannel();
-
   await subscribeMsgPack(
     rabbitMq,
     ExchangePerilTopic,
@@ -43,6 +40,16 @@ async function main() {
     SimpleQueueType.DURABLE,
     handlerLogs()
   );
+
+  // Used to run the server from a non-interactive source, like the multiserver.sh file
+  if (!process.stdin.isTTY) {
+    console.log("Non-interactive mode: skipping command input.");
+    return;
+  }
+
+  // Interactive mode: setup command channel and start command loop
+  const confirmChannel = await rabbitMq.createConfirmChannel();
+  printServerHelp();
 
   while (true) {
     const words = await getInput();
