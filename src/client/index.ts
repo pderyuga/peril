@@ -3,6 +3,7 @@ import {
   clientWelcome,
   commandStatus,
   getInput,
+  getMaliciousLog,
   printClientHelp,
   printQuit,
 } from "../internal/gamelogic/gamelogic.js";
@@ -126,7 +127,27 @@ async function main() {
     }
 
     if (words[0] === "spam") {
-      console.log("Spamming not allowed yet!");
+      if (words.length !== 2 || isNaN(Number(words[1]))) {
+        console.error("usage: spam <number> ");
+      }
+
+      const n = Number(words[1]);
+      for (let i = 0; i < n; i++) {
+        try {
+          publishMsgPack(
+            publishChannel,
+            ExchangePerilTopic,
+            `${GameLogSlug}.${username}`,
+            getMaliciousLog()
+          );
+        } catch (err) {
+          console.error(
+            "Failed to publish spam message: ",
+            (err as Error).message
+          );
+          continue;
+        }
+      }
     }
 
     if (words[0] === "quit") {

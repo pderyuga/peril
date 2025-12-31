@@ -59,6 +59,9 @@ export async function subscribe<T>(
     queueType
   );
 
+  // only deliver one acknowledged message at a time
+  await channel.prefetch(1);
+
   const onMessage = async (message: amqp.ConsumeMessage | null) => {
     if (!message) {
       console.error("Message canceled by broker");
