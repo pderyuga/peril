@@ -7,7 +7,6 @@ import {
   printQuit,
 } from "../internal/gamelogic/gamelogic.js";
 import {
-  declareAndBind,
   SimpleQueueType,
   subscribeJSON,
   AckType,
@@ -60,15 +59,6 @@ async function main() {
   );
 
   const username = await clientWelcome();
-
-  await declareAndBind(
-    rabbitMq,
-    ExchangePerilDirect,
-    `${PauseKey}.${username}`,
-    PauseKey,
-    SimpleQueueType.TRANSIENT
-  );
-
   const gameState = new GameState(username);
   const publishChannel = await rabbitMq.createConfirmChannel();
 

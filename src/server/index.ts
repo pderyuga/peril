@@ -8,7 +8,9 @@ import {
 } from "../internal/routing/routing.js";
 import type { PlayingState } from "../internal/gamelogic/gamestate.js";
 import { printServerHelp, getInput } from "../internal/gamelogic/gamelogic.js";
-import { declareAndBind, SimpleQueueType } from "../internal/pubsub/consume.js";
+import { AckType, SimpleQueueType } from "../internal/pubsub/consume.js";
+import { subscribeMsgPack } from "../internal/pubsub/consume.js";
+import { writeLog, type GameLog } from "../internal/gamelogic/logs.js";
 
 async function main() {
   console.log("Starting Peril server...");
@@ -33,12 +35,13 @@ async function main() {
 
   const confirmChannel = await rabbitMq.createConfirmChannel();
 
-  await declareAndBind(
+  await subscribeMsgPack(
     rabbitMq,
     ExchangePerilTopic,
     GameLogSlug,
     `${GameLogSlug}.*`,
-    SimpleQueueType.DURABLE
+    SimpleQueueType.DURABLE,
+    handlerLogs()
   );
 
   while (true) {
@@ -92,3 +95,17 @@ main().catch((err) => {
   console.error("Fatal error:", err);
   process.exit(1);
 });
+
+function handlerLogs(): (gameLog: GameLog) => Promise<AckType> {
+  return async (gameLog: GameLog) => {
+    try {
+      await writeLog(gameLog);
+      return AckType.Ack;
+    } catch (err) {
+      console.error("Error writing game log: ", err);
+      return AckType.NackDiscard;
+    } finally {
+      process.stdout.write("> ");
+    }
+  };
+}
