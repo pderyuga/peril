@@ -59,8 +59,8 @@ export async function subscribe<T>(
     queueType
   );
 
-  // only deliver one acknowledged message at a time
-  await channel.prefetch(1);
+  // Each server can hold up to 10 unacknowledged messages at once
+  await channel.prefetch(10);
 
   const onMessage = async (message: amqp.ConsumeMessage | null) => {
     if (!message) {
