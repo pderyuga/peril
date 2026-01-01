@@ -27,6 +27,7 @@ A multiplayer territory-control game built with RabbitMQ pub/sub messaging archi
 ## Installation
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/pderyuga/peril.git
    cd peril
@@ -57,6 +58,7 @@ npm run rabbit:logs
 ```
 
 The `rabbit.sh` script manages a Docker container named `peril_rabbitmq` and will:
+
 - Create a new container on first run
 - Reuse the existing container on subsequent runs
 - Persist your RabbitMQ configuration between runs
@@ -78,6 +80,7 @@ docker run -d --name peril_rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3.13-ma
 ### Access Management UI
 
 Open your browser and navigate to:
+
 - **URL**: http://localhost:15672
 - **Username**: `guest`
 - **Password**: `guest`
@@ -92,13 +95,14 @@ Before running the game, you need to set up exchanges and queues in RabbitMQ. Th
 
 Navigate to the **Exchanges** tab in the Management UI and create the following:
 
-| Name | Type | Description |
-|------|------|-------------|
-| `peril_direct` | direct | For direct routing (pause/resume) |
-| `peril_topic` | topic | For pattern-based routing (moves, war) |
-| `peril_dlx` | fanout | Dead letter exchange for failed messages |
+| Name           | Type   | Description                              |
+| -------------- | ------ | ---------------------------------------- |
+| `peril_direct` | direct | For direct routing (pause/resume)        |
+| `peril_topic`  | topic  | For pattern-based routing (moves, war)   |
+| `peril_dlx`    | fanout | Dead letter exchange for failed messages |
 
 **Steps**:
+
 1. Go to http://localhost:15672/#/exchanges
 2. Click "Add a new exchange"
 3. Enter the name and select the type
@@ -108,12 +112,13 @@ Navigate to the **Exchanges** tab in the Management UI and create the following:
 
 Navigate to the **Queues** tab and create:
 
-| Name | Durability | Description |
-|------|-----------|-------------|
-| `game_logs` | Durable | Stores game log messages |
-| `peril_dlq` | Durable | Dead letter queue for failed messages |
+| Name        | Durability | Description                           |
+| ----------- | ---------- | ------------------------------------- |
+| `game_logs` | Durable    | Stores game log messages              |
+| `peril_dlq` | Durable    | Dead letter queue for failed messages |
 
 **Steps**:
+
 1. Go to http://localhost:15672/#/queues
 2. Click "Add a new queue"
 3. Enter the name
@@ -164,14 +169,16 @@ npm run server
 ```
 
 You should see:
+
 ```
 Starting Peril server...
 Connection to RabbitMQ was successful!
 ```
 
 **Server Commands**:
+
 - `pause` - Send pause message to all clients
-- `resume` - Send resume message to all clients  
+- `resume` - Send resume message to all clients
 - `quit` - Exit the server
 
 ### Start a Client
@@ -208,6 +215,7 @@ Add a new unit to the map under your control.
 **Locations**: `americas`, `europe`, `africa`, `asia`, `antarctica`, `australia`
 
 **Example**:
+
 ```
 > spawn europe infantry
 Infantry unit spawned with ID: 1
@@ -218,6 +226,7 @@ Infantry unit spawned with ID: 1
 Move one of your units to a new location. If an opponent has units in that location, war will be declared!
 
 **Example**:
+
 ```
 > move asia 1
 Unit 1 moved to asia
@@ -228,6 +237,7 @@ Unit 1 moved to asia
 Display your current game state, including all your units and their locations.
 
 **Example**:
+
 ```
 > status
 Player: alice
@@ -251,7 +261,7 @@ Exit the client and close the connection.
 When running the server, you can use these commands:
 
 - **`pause`** - Broadcasts a pause message to all connected clients
-- **`resume`** - Broadcasts a resume message to all connected clients  
+- **`resume`** - Broadcasts a resume message to all connected clients
 - **`quit`** - Shuts down the server
 
 ---
@@ -263,22 +273,26 @@ Here's how to run a quick test game with two players:
 ### Setup
 
 **Terminal 1**: Start RabbitMQ (if not already running)
+
 ```bash
 npm run rabbit:start
 ```
 
 **Terminal 2**: Start the server
+
 ```bash
 npm run server
 ```
 
 **Terminal 3**: Start Client 1 (Alice)
+
 ```bash
 npm run client
 # Enter username: alice
 ```
 
 **Terminal 4**: Start Client 2 (Bob)
+
 ```bash
 npm run client
 # Enter username: bob
@@ -287,18 +301,21 @@ npm run client
 ### Gameplay
 
 **Client 1 (Alice)**:
+
 ```
 > spawn americas infantry
 Infantry unit spawned with ID: 1
 ```
 
 **Client 2 (Bob)**:
+
 ```
 > spawn europe cavalry
 Cavalry unit spawned with ID: 1
 ```
 
 **Client 1 (Alice)**: Declare war by moving into Bob's territory
+
 ```
 > move europe 1
 
@@ -364,10 +381,12 @@ peril/
 ### Exchanges
 
 - **`peril_direct`** (Direct Exchange)
+
   - Used for: Pause/resume messages
   - Routing: Exact key matching
 
-- **`peril_topic`** (Topic Exchange)  
+- **`peril_topic`** (Topic Exchange)
+
   - Used for: Army moves, war declarations, game logs
   - Routing: Pattern matching with wildcards
   - Patterns: `army_moves.*`, `war.*`, `game_logs.*`
@@ -391,9 +410,113 @@ peril/
 ### Acknowledgement System
 
 Messages can be:
+
 - **Ack**: Successfully processed, remove from queue
 - **Nack + Requeue**: Retry processing (e.g., war not resolved yet)
 - **Nack + Discard**: Failed permanently, send to dead letter queue
+
+---
+
+## Architecture Diagram
+
+The following diagram illustrates the complete message flow through RabbitMQ exchanges and queues:
+
+```mermaid
+---
+config:
+  layout: elk
+  look: handDrawn
+  theme: neutral
+  elk:
+    nodePlacementStrategy: BRANDES_KOEPF
+---
+graph TD
+    %% Publishers
+    Server[Server]
+    ClientA[Client Alice]
+    ClientB[Client Bob]
+
+    %% Exchanges
+    DirectEx[peril_direct<br/>Direct Exchange]:::exchange
+    TopicEx[peril_topic<br/>Topic Exchange]:::exchange
+    DLX[peril_dlx<br/>Dead Letter Exchange]:::deadletter
+
+    %% Queues
+    PauseA[pause.alice<br/>TRANSIENT]
+    PauseB[pause.bob<br/>TRANSIENT]
+    MoveA[army_moves.alice<br/>TRANSIENT]
+    MoveB[army_moves.bob<br/>TRANSIENT]
+    WarQ[war<br/>DURABLE SHARED]:::durable
+    LogsQ[game_logs<br/>DURABLE]:::durable
+    DLQ[peril_dlq<br/>Dead Letter Queue]:::deadletter
+
+    %% Consumers
+    ClientA2[Client Alice - Consumer]
+    ClientB2[Client Bob - Consumer]
+    Server2[Server - Consumer]
+
+    %% Pause/Resume Flow
+    Server -->|key: pause| DirectEx
+    DirectEx -->|binding: pause| PauseA
+    DirectEx -->|binding: pause| PauseB
+    PauseA --> ClientA2
+    PauseB --> ClientB2
+
+    %% Army Moves Flow
+    ClientA -->|key: army_moves.alice| TopicEx
+    ClientB -->|key: army_moves.bob| TopicEx
+    TopicEx -->|binding: army_moves.*| MoveA
+    TopicEx -->|binding: army_moves.*| MoveB
+    MoveA --> ClientA2
+    MoveB --> ClientB2
+
+    %% War Flow
+    ClientA -->|key: war.alice| TopicEx
+    ClientB -->|key: war.bob| TopicEx
+    TopicEx -->|binding: war.*| WarQ
+    WarQ --> ClientA2
+    WarQ --> ClientB2
+
+    %% Game Logs Flow
+    ClientA -->|key: game_logs.alice<br/>MessagePack| TopicEx
+    ClientB -->|key: game_logs.bob<br/>MessagePack| TopicEx
+    TopicEx -->|binding: game_logs.*| LogsQ
+    LogsQ --> Server2
+
+    %% Dead Letter Flow
+    MoveA -.->|failed| DLX
+    MoveB -.->|failed| DLX
+    WarQ -.->|failed| DLX
+    LogsQ -.->|failed| DLX
+    DLX --> DLQ
+
+    %% Class Definitions
+    classDef exchange fill:#e1f5ff
+    classDef durable fill:#fff4e1
+    classDef deadletter fill:#ffe1e1
+```
+
+### Diagram Legend
+
+| Color     | Component                                             | Description                                            |
+| --------- | ----------------------------------------------------- | ------------------------------------------------------ |
+| 🔵 Blue   | Exchanges (`peril_direct`, `peril_topic`)             | Main operational exchanges for routing messages        |
+| 🟡 Yellow | Durable Queues (`war`, `game_logs`)                   | Persist across RabbitMQ restarts, store important data |
+| 🔴 Red    | Dead Letter Infrastructure (`peril_dlx`, `peril_dlq`) | Error handling - captures and stores failed messages   |
+
+**Note**: Transient queues (pause, army_moves) are not highlighted as they auto-delete when clients disconnect.
+
+### Key Points
+
+- **Pause/Resume**: Server publishes to `peril_direct` with exact routing key `pause`. Each client has their own pause queue bound to this key.
+
+- **Army Moves**: Each client publishes moves to `peril_topic` with key `army_moves.{username}`. All clients subscribe with pattern `army_moves.*` to receive all moves.
+
+- **War Declarations**: Published to `peril_topic` with key `war.{username}`. All clients share the same `war` queue (DURABLE) bound with pattern `war.*`, so messages are distributed round-robin.
+
+- **Game Logs**: Clients publish to `peril_topic` with key `game_logs.{username}` using MessagePack encoding. This includes both war outcome logs and spam testing. Server consumes from the `game_logs` queue.
+
+- **Dead Letter**: Failed messages from any queue (with DLX configured) are routed to `peril_dlx` and ultimately to `peril_dlq` for inspection.
 
 ---
 
@@ -403,7 +526,8 @@ Messages can be:
 
 **Symptom**: `Error: connect ECONNREFUSED 127.0.0.1:5672`
 
-**Solution**: 
+**Solution**:
+
 ```bash
 npm run rabbit:start
 # Wait 5-10 seconds for RabbitMQ to fully start
@@ -411,15 +535,17 @@ npm run rabbit:start
 
 ### PRECONDITION_FAILED Error
 
-**Symptom**: 
+**Symptom**:
+
 ```
-Error: Channel closed by server: 406 (PRECONDITION_FAILED) with message 
+Error: Channel closed by server: 406 (PRECONDITION_FAILED) with message
 "PRECONDITION_FAILED - inequivalent arg 'x-dead-letter-exchange' for queue..."
 ```
 
 **Cause**: A queue already exists with different configuration than your code expects.
 
 **Solution**: Delete the problematic queue and restart:
+
 ```bash
 # Option 1: Via Management UI
 # Go to http://localhost:15672/#/queues
@@ -438,6 +564,7 @@ npm run rabbit:start
 ### Messages Not Being Received
 
 **Check**:
+
 1. Verify exchange exists and is correct type
 2. Verify queue is bound to exchange with correct routing key
 3. Check routing key pattern matches (e.g., `war.*` matches `war.alice`)
