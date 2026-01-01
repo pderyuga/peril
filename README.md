@@ -14,6 +14,7 @@ A multiplayer territory-control game built with RabbitMQ pub/sub messaging archi
 - [Quick Game Example](#quick-game-example)
 - [Project Structure](#project-structure)
 - [Architecture Overview](#architecture-overview)
+- [Architecture Diagram](#architecture-diagram)
 - [Troubleshooting](#troubleshooting)
 
 ---
