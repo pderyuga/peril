@@ -499,11 +499,11 @@ graph TD
 
 ### Diagram Legend
 
-| Color     | Component                                             | Description                                            |
-| --------- | ----------------------------------------------------- | ------------------------------------------------------ |
-| 🔵 Blue   | Exchanges (`peril_direct`, `peril_topic`)             | Main operational exchanges for routing messages        |
-| 🟡 Yellow | Durable Queues (`war`, `game_logs`)                   | Persist across RabbitMQ restarts, store important data |
-| 🔴 Red    | Dead Letter Infrastructure (`peril_dlx`, `peril_dlq`) | Error handling - captures and stores failed messages   |
+| Color | Component                                             | Description                                            |
+| ------| ----------------------------------------------------- | ------------------------------------------------------ |
+| 🔵    | Exchanges (`peril_direct`, `peril_topic`)             | Main operational exchanges for routing messages        |
+| 🟡    | Durable Queues (`war`, `game_logs`)                   | Persist across RabbitMQ restarts, store important data |
+| 🔴    | Dead Letter Infrastructure (`peril_dlx`, `peril_dlq`) | Error handling - captures and stores failed messages   |
 
 **Note**: Transient queues (pause, army_moves) are not highlighted as they auto-delete when clients disconnect.
 
