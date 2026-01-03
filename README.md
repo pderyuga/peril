@@ -422,80 +422,9 @@ Messages can be:
 
 The following diagram illustrates the complete message flow through RabbitMQ exchanges and queues:
 
-```mermaid
----
-config:
-  layout: elk
-  look: handDrawn
-  theme: neutral
-  elk:
-    nodePlacementStrategy: BRANDES_KOEPF
----
-graph TD
-    %% Publishers
-    Server[Server]
-    ClientA[Client Alice]
-    ClientB[Client Bob]
+![Architecture Diagram](docs/images/architecture-diagram.png)
 
-    %% Exchanges
-    DirectEx[peril_direct<br/>Direct Exchange]:::exchange
-    TopicEx[peril_topic<br/>Topic Exchange]:::exchange
-    DLX[peril_dlx<br/>Dead Letter Exchange]:::deadletter
-
-    %% Queues
-    PauseA[pause.alice<br/>TRANSIENT]
-    PauseB[pause.bob<br/>TRANSIENT]
-    MoveA[army_moves.alice<br/>TRANSIENT]
-    MoveB[army_moves.bob<br/>TRANSIENT]
-    WarQ[war<br/>DURABLE SHARED]:::durable
-    LogsQ[game_logs<br/>DURABLE]:::durable
-    DLQ[peril_dlq<br/>Dead Letter Queue]:::deadletter
-
-    %% Consumers
-    ClientA2[Client Alice - Consumer]
-    ClientB2[Client Bob - Consumer]
-    Server2[Server - Consumer]
-
-    %% Pause/Resume Flow
-    Server -->|key: pause| DirectEx
-    DirectEx -->|binding: pause| PauseA
-    DirectEx -->|binding: pause| PauseB
-    PauseA --> ClientA2
-    PauseB --> ClientB2
-
-    %% Army Moves Flow
-    ClientA -->|key: army_moves.alice| TopicEx
-    ClientB -->|key: army_moves.bob| TopicEx
-    TopicEx -->|binding: army_moves.*| MoveA
-    TopicEx -->|binding: army_moves.*| MoveB
-    MoveA --> ClientA2
-    MoveB --> ClientB2
-
-    %% War Flow
-    ClientA -->|key: war.alice| TopicEx
-    ClientB -->|key: war.bob| TopicEx
-    TopicEx -->|binding: war.*| WarQ
-    WarQ --> ClientA2
-    WarQ --> ClientB2
-
-    %% Game Logs Flow
-    ClientA -->|key: game_logs.alice<br/>MessagePack| TopicEx
-    ClientB -->|key: game_logs.bob<br/>MessagePack| TopicEx
-    TopicEx -->|binding: game_logs.*| LogsQ
-    LogsQ --> Server2
-
-    %% Dead Letter Flow
-    MoveA -.->|failed| DLX
-    MoveB -.->|failed| DLX
-    WarQ -.->|failed| DLX
-    LogsQ -.->|failed| DLX
-    DLX --> DLQ
-
-    %% Class Definitions
-    classDef exchange fill:#e1f5ff
-    classDef durable fill:#fff4e1
-    classDef deadletter fill:#ffe1e1
-```
+*[View diagram source](docs/architecture-diagram.mmd)*
 
 ### Diagram Legend
 
